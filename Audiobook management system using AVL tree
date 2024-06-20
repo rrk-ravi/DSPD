@@ -1,0 +1,811 @@
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#define MAX_LENGTH 100
+ 
+
+struct Audiobook {
+    int AudiobookID;
+    char Title[MAX_LENGTH];
+    char Author[MAX_LENGTH];
+    char Narrator[MAX_LENGTH];
+    float Duration;
+    char Genre[MAX_LENGTH];
+    float Rating;
+    struct Audiobook *next;
+};
+
+struct User {
+    int userID;
+    char Name[MAX_LENGTH];
+    char Email[MAX_LENGTH];
+    char Preferences[MAX_LENGTH];
+    struct Audiobook *Library;  
+    struct User *next;
+};
+
+// Function prototypes
+void addAudiobook(struct Audiobook **head, int AudiobookID, char Title[], char Author[], char Narrator[], float Duration, char Genre[], float Rating);
+void editAudiobook(struct Audiobook **head, int audiobookID);
+void addUser(struct User **head, char Name[], char Email[], char Preferences[],int userID);
+void DisplayAudibookList(struct Audiobook *head);
+void DisplayUser(struct User *head);
+void searchAudiobook(struct Audiobook *head, char Title[]);
+void AddToUserLibrary(struct User **head, int UserID, struct Audiobook **Audiobook,int AudiobookID);
+void deleteAudiobook(struct Audiobook **head, char Title[]);
+void Listening_progress(struct User **head, int UserID, int AudiobookID, float Progress);
+void rateAudiobook(struct Audiobook *head, int AudiobookID, float rating);
+void mostPopularAudiobook(struct Audiobook *head);
+void ListeningHistoryReportUser(struct User *head, int UserID);
+void mergeUserLibrary(struct User *head, int UserID1, int UserID2);
+void listeningHistoryReportAudiobook(struct User *head, int AudiobookID);
+
+FILE *createFile(const char *filename);
+void saveUserToFile(struct User *head, const char *filename);
+void loadAudiobookFromFile(struct Audiobook **head, const char *filename);
+void loadUserFromFile(struct User **head, const char *filename);
+void saveAudiobookToFile(struct Audiobook *head, const char *filename);
+void freeAudiobookList(struct Audiobook **head);
+void freeUserList(struct User **head);
+
+// Function definitions
+
+void editAudiobook(struct Audiobook **head, int audiobookID) {
+    struct Audiobook *temp = *head;
+       
+    int choice;
+    do {
+        if (temp != NULL && temp->AudiobookID == audiobookID) {
+           
+            printf("Select attribute to edit:\n");
+            printf("1. Title\n");
+            printf("2. Author\n");
+            printf("3. Narrator\n");
+            printf("4. Duration\n");
+            printf("5. Genre\n");
+            printf("6. Rating\n");
+            printf("0. Exit\n");
+            printf("Enter your choice: ");
+            scanf("%d", &choice);
+
+            switch (choice) {
+                case 1: {
+                    printf("Enter new title: ");
+                    scanf("%s", temp->Title);
+                    break;
+                }
+                case 2: {
+                    printf("Enter new author: ");
+                    scanf("%s", temp->Author);
+                    break;
+                }
+                case 3: {
+                    printf("Enter new narrator: ");
+                    scanf("%s", temp->Narrator);
+                    break;
+                }
+                case 4: {
+                    printf("Enter new duration: ");
+                    scanf("%f", &temp->Duration);
+                    break;
+                }
+                case 5: {
+                    printf("Enter new genre: ");
+                    scanf("%s", temp->Genre);
+                    break;
+                }
+                case 6: {
+                    printf("Enter new rating: ");
+                    scanf("%f", &temp->Rating);
+                    break;
+                }
+                case 0: {
+                    printf("Exiting edit mode.\n");
+                    return;
+                }
+                default: {
+                    printf("Invalid choice. Please try again.\n");
+                    break;
+                }
+            }
+            printf("Audiobook edited successfully.\n");
+        } else if (temp == NULL) {
+            printf("Audiobook with ID %d not found.\n", audiobookID);
+            return;
+        }
+        temp = temp->next;
+    } while (1);
+}
+
+
+FILE *createFile(const char *filename) {
+    FILE *file = fopen(filename, "a");
+    fclose(file);
+    return fopen(filename, "r+");
+}
+// // Function to save User data to a file
+void saveUserToFile(struct User *head, const char *filename) {
+    FILE *file = createFile(filename);
+    if (file == NULL) {
+        perror("Error opening file");
+        return;
+    }
+    struct User *temp = head;
+    while (temp != NULL) {
+        fprintf(file, "%d,%s,%s,%s\n", temp->userID, temp->Name, temp->Email, temp->Preferences);
+        temp = temp->next;
+    }
+    fclose(file);
+}
+
+// Function to load Audiobook data from a file
+void loadAudiobookFromFile(struct Audiobook **head, const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        perror("Error opening file");
+        return;
+    }
+
+    int AudiobookID;
+    char Title[50], Author[50], Narrator[50], Genre[50];
+    float Duration, Rating;
+
+    while (fscanf(file, "%d,%49[^,],%49[^,],%49[^,],%f,%49[^,],%f\n",
+                  &AudiobookID, Title, Author, Narrator, &Duration, Genre, &Rating) == 7) {
+        addAudiobook(head, AudiobookID, Title, Author, Narrator, Duration, Genre, Rating);
+    }
+
+    fclose(file);
+}
+
+// Function to load User data from a file
+void loadUserFromFile(struct User **head, const char *filename) {
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        perror("Error opening file");
+        return;
+    }
+
+    int userID;
+    char Name[50], Email[50], Preferences[100];
+
+    while (fscanf(file, "%d,%49[^,],%49[^,],%99[^\n]\n", &userID, Name, Email, Preferences) == 4) {
+        addUser(head, Name, Email, Preferences, userID);
+    }
+
+    fclose(file);
+}
+void saveAudiobookToFile(struct Audiobook *head, const char *filename) {
+    FILE *file = createFile(filename);
+    if (file == NULL) {
+        perror("Error opening file");
+        return;
+    }
+    struct Audiobook *temp = head;
+    while (temp != NULL) {
+        fprintf(file, "%d,%s,%s,%s,%.2f,%s,%.1f\n",
+                temp->AudiobookID, temp->Title, temp->Author, temp->Narrator, temp->Duration, temp->Genre, temp->Rating);
+        temp = temp->next;
+    }
+    fclose(file);
+}
+
+
+void addAudiobook(struct Audiobook **head, int AudiobookID, char Title[], char Author[], char Narrator[], float Duration, char Genre[], float Rating) {
+    // Check if AudiobookID is already in use
+    struct Audiobook *temp = *head;
+    while (temp != NULL) {
+        if (temp->AudiobookID == AudiobookID) {
+            printf("Audiobook with ID %d already exists. Please choose a different ID.\n", AudiobookID);
+            return;
+        }
+        temp = temp->next;
+    }
+
+    // If AudiobookID is unique, proceed with adding the audiobook
+    struct Audiobook *newAudiobook = (struct Audiobook *)malloc(sizeof(struct Audiobook));
+    newAudiobook->AudiobookID = AudiobookID;
+    strcpy(newAudiobook->Title, Title);
+    strcpy(newAudiobook->Author, Author);
+    strcpy(newAudiobook->Narrator, Narrator);
+    newAudiobook->Duration = Duration;
+    strcpy(newAudiobook->Genre, Genre);
+    newAudiobook->Rating = Rating;
+
+    // Check if the new audiobook should be the new head
+    if (*head == NULL || AudiobookID < (*head)->AudiobookID) {
+        newAudiobook->next = *head;
+        *head = newAudiobook;
+        return;
+    }
+
+    // Insert the new audiobook in the sorted order
+    temp = *head;
+    while (temp->next != NULL && temp->next->AudiobookID < AudiobookID) {
+        temp = temp->next;
+    }
+
+    newAudiobook->next = temp->next;
+    temp->next = newAudiobook;
+}
+
+
+void addUser(struct User **head, char Name[], char Email[], char Preferences[], int userID) {
+    // Check if userID is already in use
+    struct User *temp = *head;
+    while (temp != NULL) {
+        if (temp->userID == userID) {
+            printf("User with ID %d already exists. Please choose a different ID.\n", userID);
+            return;
+        }
+        temp = temp->next;
+    }
+
+    // If userID is unique, proceed with adding the user
+    struct User *newUser = (struct User *)malloc(sizeof(struct User));
+    newUser->userID = userID;
+    strcpy(newUser->Name, Name);
+    strcpy(newUser->Email, Email);
+    strcpy(newUser->Preferences, Preferences);
+    newUser->Library = NULL;
+
+    // Check if the new user should be the new head
+    if (*head == NULL || userID < (*head)->userID) {
+        newUser->next = *head;
+        *head = newUser;
+        return;
+    }
+
+    // Insert the new user in the sorted order
+    temp = *head;
+    while (temp->next != NULL && temp->next->userID < userID) {
+        temp = temp->next;
+    }
+
+    newUser->next = temp->next;
+    temp->next = newUser;
+}
+
+
+void DisplayAudibookList(struct Audiobook *head) {
+    struct Audiobook *temp = head;
+    while (temp != NULL) {
+        printf("AudiobookId: %d, Title: %s, Author: %s, Narrator: %s, Duration: %.2f, Genre: %s, Rating: %.1f\n",
+               temp->AudiobookID, temp->Title, temp->Author, temp->Narrator, temp->Duration, temp->Genre, temp->Rating);
+        temp = temp->next;
+    }
+}
+
+void DisplayUser(struct User *head) {
+    struct User *temp = head;
+    while (temp != NULL) {
+        printf("UserID: %d, Name: %s, Email: %s, Preferences: %s\n", temp->userID, temp->Name, temp->Email, temp->Preferences);
+        temp = temp->next;
+    }
+}
+
+void searchAudiobook(struct Audiobook *head, char Title[]) {
+    struct Audiobook *temp = head;
+    while (temp != NULL) {
+        if (strcmp(temp->Title, Title) == 0) {
+            printf("AudiobookId: %d, Title: %s, Author: %s, Narrator: %s, Duration: %.2f, Genre: %s, Rating: %.1f\n",
+                   temp->AudiobookID, temp->Title, temp->Author, temp->Narrator, temp->Duration, temp->Genre, temp->Rating);
+            return;
+        }
+        temp = temp->next;
+    }
+    printf("Audiobook Title: %s not found\n", Title);
+}
+
+void AddToUserLibrary(struct User **head, int UserID, struct Audiobook **audiobookHead, int AudiobookID) {
+    struct User *tempUser = *head;
+
+    while (tempUser != NULL) {
+        if (tempUser->userID == UserID) {
+            struct Audiobook *tempAudiobook = *audiobookHead;
+            while (tempAudiobook != NULL) {
+                if (tempAudiobook->AudiobookID == AudiobookID) {
+                    struct Audiobook *addlib = (struct Audiobook *)malloc(sizeof(struct Audiobook));
+                    if (addlib == NULL) {
+                        printf("Memory allocation failed\n");
+                        return;
+                    }
+
+                    addlib->AudiobookID = tempAudiobook->AudiobookID;
+                    strcpy(addlib->Title, tempAudiobook->Title);
+                    strcpy(addlib->Author, tempAudiobook->Author);
+                    strcpy(addlib->Narrator, tempAudiobook->Narrator);
+                    addlib->Duration = tempAudiobook->Duration;
+                    strcpy(addlib->Genre, tempAudiobook->Genre);
+                    addlib->Rating = tempAudiobook->Rating;
+
+                    addlib->next = tempUser->Library;
+                    tempUser->Library = addlib;
+
+                    printf("Audiobook added to User %d's library.\n", UserID);
+                    return;
+                }
+                tempAudiobook = tempAudiobook->next;
+            }
+            printf("Audiobook with ID %d not found.\n", AudiobookID);
+            return;   
+        }
+        tempUser = tempUser->next;
+    }
+    printf("User with ID %d not found.\n", UserID);
+}
+
+
+// void deleteAudiobookFromFile(const char *filename, const char *titleToDelete) {
+//     FILE *file = fopen(filename, "r");
+//     if (file == NULL) {
+//         perror("Error opening file");
+//         return;
+//     }
+//     FILE *tempFile = fopen("temp.txt", "w");
+//     if (tempFile == NULL) {
+//         perror("Error creating temporary file");
+//         fclose(file);
+//         return;
+//     }
+//     char line[MAX_LENGTH];
+//     while (fgets(line, sizeof(line), file)) {
+//         char *token = strtok(line, ",");
+//         if (strcmp(token, titleToDelete) != 0) {
+//             fputs(line, tempFile);
+//         }
+//     }
+//     fclose(file);
+//     fclose(tempFile);
+//     remove(filename);
+//     rename("audiobooks.txt", filename);
+// }
+
+
+void deleteAudiobook(struct Audiobook **head, char Title[]) {
+    struct Audiobook *temp = *head;
+    struct Audiobook *prev = NULL;
+    if (temp != NULL && strcmp(temp->Title, Title) == 0) {
+        *head = temp->next;
+        free(temp);
+        printf("Audiobook: %s is successfully deleted\n", Title);
+        saveAudiobookToFile(*head, "audiobooks.txt");//save to file
+        return;
+    }
+    while (temp != NULL) {
+        if (strcmp(temp->Title, Title) == 0) {
+            prev->next = temp->next;
+            free(temp);
+            printf("Audiobook: %s successfully deleted\n", Title);
+            saveAudiobookToFile(*head, "audiobooks.txt");//save to file
+            return;
+        }
+        prev = temp;
+        temp = temp->next;
+    }
+    printf("Audiobook: %s not found\n", Title);
+}
+
+void Listening_progress(struct User **head, int UserID, int AudiobookID, float Progress) {
+    struct User *tempUser = *head;
+    while (tempUser != NULL) {
+        if (tempUser->userID == UserID) {
+            struct Audiobook *tempAudiobook = tempUser->Library;
+            while (tempAudiobook != NULL) {
+                if (tempAudiobook->AudiobookID == AudiobookID) {
+                     
+                    printf("Updated listening progress for user %d, Audiobook %d: %.2f%%\n", UserID, AudiobookID, Progress);
+                    return;
+                }
+                tempAudiobook = tempAudiobook->next;
+            }
+            printf("Audiobook with ID %d not found in the library of User %d.\n", AudiobookID, UserID);
+        }
+        tempUser = tempUser->next;
+    }
+    printf("User with ID %d not found.\n", UserID);
+}
+ 
+void rateAudiobook(struct Audiobook *head, int AudiobookID, float Rating) {
+     struct Audiobook *temp = head;
+     
+     
+    while (temp != NULL) {
+        if (temp->AudiobookID == AudiobookID) {
+            static int i = 1;
+            temp->Rating = (temp->Rating * (i-1) + Rating)/i;
+            i++;
+            return;
+        }
+        temp = temp->next;
+    }
+}
+
+void mostPopularAudiobook(struct Audiobook *head) {
+    if (head == NULL) {
+        printf("No audiobooks available.\n");
+        return;
+    }
+
+    struct Audiobook *temp = head;
+    struct Audiobook *mostPopular = head;
+
+    while (temp != NULL) {
+        if (temp->Rating > mostPopular->Rating) {
+            mostPopular = temp;
+        }
+        temp = temp->next;
+    }
+
+    printf("Most Popular Audiobook is:\n");
+    printf("AudiobookID: %d, Title: %s, Author: %s, Rating: %.2f\n",
+           mostPopular->AudiobookID, mostPopular->Title, mostPopular->Author, mostPopular->Rating);
+}
+
+void ListeningHistoryReportUser(struct User *head, int UserID) {
+    struct User *currUser = head;
+    while (currUser != NULL) {
+        if (currUser->userID == UserID) {
+            struct Audiobook *currentAudiobook = currUser->Library;
+            while (currentAudiobook != NULL) {
+                printf("Title: %s, Author: %s\n", currentAudiobook->Title, currentAudiobook->Author);
+                currentAudiobook = currentAudiobook->next;
+            }
+            return;
+        }
+        currUser = currUser->next;
+    }
+    printf("User with ID %d not found.\n", UserID);
+}
+
+void mergeUserLibrary(struct User *head, int UserID1, int UserID2) {
+    struct User *User1 = NULL;
+    struct User *User2 = NULL;
+    struct User *temp = head;
+
+    // Find the users with the specified UserIDs
+    while (temp != NULL && (User1 == NULL || User2 == NULL)) {
+        if (temp->userID == UserID1) {
+            User1 = temp;
+        }
+        if (temp->userID == UserID2) {
+            User2 = temp;
+        }
+        temp = temp->next;
+    }
+
+    // Check if both users are found
+    if (User1 == NULL || User2 == NULL) {
+        printf("One or both users not found!\n");
+        return;
+    }
+
+    struct Audiobook *currentAudiobook = User2->Library;
+    while (currentAudiobook != NULL) {
+        AddToUserLibrary(&head, UserID1, &currentAudiobook, currentAudiobook->AudiobookID);
+        currentAudiobook = currentAudiobook->next;
+    }
+
+    printf("User library merge successful!\n");
+}
+
+void listeningHistoryReportAudiobook(struct User *head, int AudiobookID) {
+    struct User *temp = head;
+    printf("Listening History Report for Audiobook %d:\n", AudiobookID);
+    while (temp != NULL) {
+        struct Audiobook *currentAudiobook = temp->Library;
+        while (currentAudiobook != NULL) {
+            if (currentAudiobook->AudiobookID == AudiobookID) {
+                printf("User: %d\n", temp->userID);
+            }
+            currentAudiobook = currentAudiobook->next;
+        }
+        temp = temp->next;
+    }
+}
+
+// void DisplayUserLibrary(struct User *head,int id) {
+//     struct User *temp = head;
+//     while (temp != NULL) {
+//        if(temp->userID == id){
+//              struct Audiobook *lib = temp->Library;
+//              while(lib != NULL){
+//                   printf("AudiobookId: %d, Title: %s, Author: %s, Narrator: %s, Duration: %.2f, Genre: %s, Rating: %.1f\n",
+//                 lib->AudiobookID, lib->Title, lib->Author, lib->Narrator, lib->Duration, lib->Genre, lib->Rating);
+//                  lib = lib->next;
+//              }
+//        }
+//         temp = temp->next;
+//     }
+// }//above function     
+
+    //     int main() {
+    //     struct Audiobook *audiobookHead = NULL;
+    //     struct User *userHead = NULL;
+    //     // Load data from files
+    //     loadAudiobookFromFile(&audiobookHead, "audiobooks.txt");
+    //     // Add some audiobooks
+    //     // addAudiobook(&audiobookHead, 1, "Title1", "Author1", "Narrator1", 10.5, "Genre1", 0);
+    //     // addAudiobook(&audiobookHead, 2, "Title2", "Author2", "Narrator2", 8.2, "Genre2", 0);
+    //     // Display the list of audiobooks
+    //     printf("display audiobook taken \n");
+    //     DisplayAudibookList(audiobookHead);
+    //     //searching
+    //     printf("searching audiobook \n");
+    //     searchAudiobook(audiobookHead, "Title1");
+    //     // Add some users
+    //     loadUserFromFile(&userHead, "users.txt");
+    //     printf(" display user \n");
+    //     // addUser(&userHead, "Ravi", "ravi@gmail.com", "preferences1", 28980);
+    //     // addUser(&userHead, "Anmol", "anmol@gmail.com", "preferences2", 28981);
+    //     // Display the list of users
+    //     DisplayUser(userHead);
+    //     // Add audiobooks to a user's library
+    //     AddToUserLibrary(&userHead, 28980, &audiobookHead, 1);
+    //     AddToUserLibrary(&userHead, 28980, &audiobookHead, 2);
+    //     // Display the user's library
+    //     printf("\nUser 28980 Library:\n");
+    //     DisplayUserLibrary(userHead, 28980);
+    //     //listning progress
+    //     printf("listning progress \n");
+    //     Listening_progress(&userHead,28980,1,5);
+    //         //Rate Audiobook
+    //         printf("rating of audiobook");
+    //         rateAudiobook(audiobookHead,1,3);
+    //         //most popular audiobook
+    //         printf("most popular audiobook \n");
+    //         mostPopularAudiobook(audiobookHead);
+    //     // Merge user libraries
+    //     printf("merging user liberary of two users \n");
+    //     mergeUserLibrary(userHead, 28981, 28980); //here   1.empty , 2.full
+    //     // Display the merged user library
+    //     printf("\nMerged User Library(28981,28980):\n");
+    //     DisplayUserLibrary(userHead, 28981);
+    //     //listning history
+    //     ListeningHistoryReportUser(userHead, 28980);   //same function like display user liberary
+    //     // Save data to files
+    //     // saveAudiobookToFile(audiobookHead, "audiobooks.txt");
+    //     // saveUserToFile(userHead, "users.txt");
+    //     return 0;
+    //     }
+
+
+
+void freeAudiobookList(struct Audiobook **head) {
+    struct Audiobook *current = *head;
+    while (current != NULL) {
+        struct Audiobook *temp = current;
+        current = current->next;
+        free(temp);
+    }
+    *head = NULL; // Update head pointer to NULL after freeing all nodes
+}
+
+void freeUserList(struct User **head) {
+    struct User *current = *head;
+    while (current != NULL) {
+        struct User *temp = current;
+        current = current->next;
+        free(temp);
+    }
+    *head = NULL; // Update head pointer to NULL after freeing all nodes
+}
+
+int main() {
+    struct Audiobook *audiobookHead = NULL;
+    struct User *userHead = NULL;
+
+    // Load audiobook and user data from files
+    loadAudiobookFromFile(&audiobookHead, "audiobooks.txt");
+    loadUserFromFile(&userHead, "users.txt");
+
+    int choice;
+
+    do {
+        // Display menu options
+        printf("\n------ Audiobook Library System ------\n");
+        printf("1. Add Audiobook\n");
+        printf("2. Delete Audiobook\n");
+        printf("3. Search Audiobook\n");
+        printf("4. Add User Profile\n");
+        printf("5. Add to User Library\n");
+        printf("6. Listening Progress\n");
+        printf("7. Display User Libraries\n");
+        printf("8. Rate Audiobook\n");
+        printf("9. Most Popular Audiobook\n");
+        printf("10. Listening History Report (User)\n");
+        printf("11. Merge User Libraries\n");
+        printf("12. Listening History Report (Audiobook)\n");
+        printf("13. Display Audiobook List\n");
+        printf("14. edit audiobook List\n");
+        printf("0. Exit\n");
+        printf("-------------------------------------\n");
+        printf("Enter your choice: ");
+        scanf("%d", &choice);
+
+        switch (choice) {
+            case 1: {
+            // Add Audiobook
+                int AudiobookID;
+                char Title[MAX_LENGTH], Author[MAX_LENGTH], Narrator[MAX_LENGTH], Genre[MAX_LENGTH];
+                float Duration, Rating;
+                
+                printf("Enter Audiobook ID: ");
+                scanf("%d", &AudiobookID);
+                printf("Enter Title: ");
+                scanf("%s", Title);
+                printf("Enter Author: ");
+                scanf("%s", Author);
+                printf("Enter Narrator: ");
+                scanf("%s", Narrator);
+                printf("Enter Duration: ");
+                scanf("%f", &Duration);
+                printf("Enter Genre: ");
+                scanf("%s", Genre);
+                printf("Enter Rating: ");
+                scanf("%f", &Rating);
+                
+                addAudiobook(&audiobookHead, AudiobookID, Title, Author, Narrator, Duration, Genre, Rating);
+
+                saveAudiobookToFile(audiobookHead, "audiobooks.txt");
+                printf("Audiobook added successfully.\n");
+                break;
+            }
+            case 2: {
+                // Delete Audiobook
+                char deleteTitle[MAX_LENGTH];
+                printf("Enter Title of the audiobook to delete: ");
+                scanf(" %s", deleteTitle);
+                deleteAudiobook(&audiobookHead, deleteTitle);
+
+                // deleteAudiobookFromFile(audiobookHead, "audiobooks.txt");
+                break;
+            }
+            case 3: {
+                // Search Audiobook
+                char searchCriteria[MAX_LENGTH];
+                printf("Enter search criteria (title, author, genre): ");
+                scanf("%s", searchCriteria);
+                searchAudiobook(audiobookHead, searchCriteria);
+                break;
+            }
+            case 4: {
+                // Add User Profile
+                int userID;
+                char Name[MAX_LENGTH], Email[MAX_LENGTH], Preferences[MAX_LENGTH];
+                
+                printf("Enter User ID: ");
+                scanf("%d", &userID);
+                printf("Enter Name: ");
+                scanf("%s", Name);
+                printf("Enter Email: ");
+                scanf("%s", Email);
+                printf("Enter Preferences: ");
+                scanf("%s", Preferences);
+                
+                addUser(&userHead, Name, Email, Preferences, userID);
+                saveUserToFile(userHead, "users.txt");
+
+                printf("User profile created successfully.\n");
+                break;
+            }
+            case 5: {
+                // Add to User Library
+                int userID, audiobookID;
+                
+                printf("Enter User ID: ");
+                scanf("%d", &userID);
+                printf("Enter Audiobook ID: ");
+                scanf("%d", &audiobookID);
+                
+                AddToUserLibrary(&userHead, userID, &audiobookHead, audiobookID);
+                printf("Audiobook added to the user's library successfully.\n");
+                break;
+            }
+            case 6: {
+                // Listening Progress
+                int userID, audiobookID;
+                float progress;
+                
+                printf("Enter User ID: ");
+                scanf("%d", &userID);
+                printf("Enter Audiobook ID: ");
+                scanf("%d", &audiobookID);
+                printf("Enter Listening Progress (percentage): ");
+                scanf("%f", &progress);
+                
+                Listening_progress(&userHead, userID, audiobookID, progress);
+                printf("Listening progress updated successfully.\n");
+                break;
+            }
+            case 7: {
+                // Display User Libraries
+                DisplayUser(userHead);
+                break;
+            }
+            case 8: {
+                // Rate Audiobook
+                int audiobookID;
+                float rating;
+                
+                printf("Enter Audiobook ID: ");
+                scanf("%d", &audiobookID);
+                printf("Enter rating (1 to 5): ");
+                scanf("%f", &rating);
+                
+                rateAudiobook(audiobookHead, audiobookID, rating);
+                 
+                printf("Rating updated successfully.\n");
+                break;
+            }
+            case 9: {
+                // Most Popular Audiobook
+                mostPopularAudiobook(audiobookHead);
+                break;
+            }
+            case 10: {
+                // Listening History Report (User)
+                int userID;
+                
+                printf("Enter User ID: ");
+                scanf("%d", &userID);
+                
+                ListeningHistoryReportUser(userHead, userID);
+                break;
+            }
+            case 11: {
+                // Merge User Libraries
+                int userID1, userID2;
+                
+                printf("Enter User ID 1: ");
+                scanf("%d", &userID1);
+                printf("Enter User ID 2: ");
+                scanf("%d", &userID2);
+                
+                mergeUserLibrary(userHead, userID1, userID2);
+                printf("User libraries merged successfully.\n");
+                break;
+            }
+            case 12: {
+                // Listening History Report (Audiobook)
+                int audiobookID;
+                
+                printf("Enter Audiobook ID: ");
+                scanf("%d", &audiobookID);
+                
+                listeningHistoryReportAudiobook(userHead, audiobookID);
+                break;
+            }
+            case 13: {
+                // Display Audiobook List
+                DisplayAudibookList(audiobookHead);
+                break;
+            }
+            case 14: {
+                // edit Audiobook List
+                int n;
+                printf("enter audiobookID: ");
+                scanf("%d ",&n);
+                editAudiobook(&audiobookHead, n);
+                break;
+            }
+            case 0: {
+                // Exit
+                freeAudiobookList(&audiobookHead);
+                freeUserList(&userHead);
+                printf("Exiting program. Goodbye!\n");
+                break;
+            }
+            default:
+                printf("Invalid choice. Please try again.\n");
+        }
+    } while (choice != 0);
+
+    
+        // saveAudiobookToFile(audiobookHead, "audiobooks.txt");
+        // saveUserToFile(userHead, "users.txt");
+
+    return 0;
+}
+
